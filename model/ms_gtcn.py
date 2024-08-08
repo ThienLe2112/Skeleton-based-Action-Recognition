@@ -141,34 +141,8 @@ class SpatialTemporal_MS_GCN(nn.Module):
 
         # Compute the pairwise distances in a vectorized manner
         dists = torch.norm(xx_reshaped[:, :, None, :] - xx_reshaped[:, None, :, :], dim=-1)
-        # print("dists.shape: ", dists.shape)
 
-        # # Sum the distances across all samples
-        # A_dsg_frame = dists.sum(dim=0) / N_xx
-
-        # # Normalize by the number of samples
-        # A_dsg= A_dsg_frame
         A_dsg=dists
-        # print("A_dsg.shape: ",A_dsg.shape)
-
-       
-        
-        # import seaborn as sns
-        # import pandas as pd
-        # import matplotlib.pyplot as plt
-
-        # for i in range(100):
-        #     lamda=i
-        #     A_dsg_all=torch.exp(-(A_dsg**2)/lamda)
-        #     px = pd.DataFrame(A_dsg_all.cpu().numpy())
-        #     print(px)
-        #     # # glue = sns.load_dataset("glue").pivot(index="Model", columns="Task", values="Score")
-        #     sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True)
-        #     plt.title(f'L = {i}')
-        #     plt.show()
-
-        # print(A_dsg_all)
-        # threshold=0.8
         
         lamda=1
         A_dsg_all=torch.exp(-(A_dsg**2)/lamda)
@@ -176,53 +150,29 @@ class SpatialTemporal_MS_GCN(nn.Module):
         A_dsg_all=self.conv.to('cuda')(A_dsg_all)
 
         A_binary_with_I = A_dsg_all
-
+        print("A_binary_with_I.shape: ",A_binary_with_I.shape)
         
-        # # Build spatial-temporal graph
-        # A_large = A_binary_with_I.repeat(self.window_size, self.window_size).clone()
-
-        # A = A_large
-        # print('A.shape')
-        # A_scales = [normalize_dsg_adjacency_matrix(A) for k in range(self.num_scales)]
-        # A_scales = [A for k in range(self.num_scales)]
-        # A_scales = [torch.matrix_power(g, k) for k, g in enumerate(A_scales)]
-        # A_scales = torch.cat(A_scales)
-        
-        # print("A_binary_with_I.shape: ",A_binary_with_I.shape)
-
-        ##Testing
-        # print("A_binary_with_I.shape: ",A_binary_with_I.shape)
         A_large = torch.stack([i.repeat(self.window_size, self.window_size).clone() for i in A_binary_with_I[0,0]])
         A = A_large
 
-
-        # print('A.shape: ',A.shape)
         # A_scales = [normalize_dsg_adjacency_matrix(A) for k in range(self.num_scales)]
-        # print("A.shape: ",A.shape)
         A_scales = [A for k in range(self.num_scales)]
 
         
         A_scales = torch.stack([A[i] for i in range(len(A)) for k in range(self.num_scales) ]) 
-        
-        # A_scales= A
-        # print("A_scales.shape: ",A_scales.shape )
-        # print(enumerate(A_scales[0]))
-        # A_scales = torch.stack([torch.matrix_power(g, k) for i in range(len(A_scales)) for k, g in enumerate(A_scales[i])] )
 
-        # print("A_scales.shape: ",A_scales.shape)
         A_scales = A_scales[:,None,:,:]
         A_scales = torch.stack([torch.matrix_power(g, k) for i in A_scales for k, g in enumerate(i)])
-        # print(A_scales)
-        # print("A_scales.shape: ",A_scales.shape )
-        if torch.isnan(A_scales).any()==True :
-            print(torch.isnan(A_scales).any())
-            print("A_scales: ", A_scales)
-            return 0
+        
+        # if torch.isnan(A_scales).any()==True :
+        #     print(torch.isnan(A_scales).any())
+        #     print("A_scales: ", A_scales)
+        #     return 0
 
         t_a, v_a, v_a2=A_scales.shape
-        # print("A_scales.shape: ",A_scales.shape )
+        
         A_scales=A_scales.reshape(1,1,t_a,v_a,v_a2)
-        # print("A_scales.shape: ", A_scales.shape)
+        
 
         self.A_scales = torch.Tensor(A_scales)
         
@@ -233,14 +183,7 @@ class SpatialTemporal_MS_GCN(nn.Module):
         res = self.residual(x)
         _,_,n,_,_=A.shape
 
-        # print('3',torch.isnan(agg).any())
-        # agg = torch.stack([torch.einsum('vu,ctu->ctv', A[0,0,i], x[i]) for i in range(n)])
-
         agg = torch.stack([torch.einsum('vu,ctu->ctv', A[0,0,i], x[i]) for i in range(n)])
-        # if torch.isnan(agg).any()==True :
-        #     print("agg: ", agg)
-        #     return 0
-        # print("agg.shape: ",agg.shape)
         ##Edit Code End 6
 
         # Perform Graph Convolution
