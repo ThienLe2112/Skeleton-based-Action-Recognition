@@ -104,17 +104,7 @@ class SpatialTemporal_MS_GCN(nn.Module):
 
     def forward(self, x):
         ##Edit Code Begin 5
-        x,xx = x
-
-        # print('x.shape: ',x.shape)
-        # print('xx.shape: ',xx.shape)
-        # print(x[0,0,0,:])
-        # print(xx[:3,0,:])
-
-        # print(xx[:10,:,:])
-        # print('x.shape: ',x.shape)
-        # print('self.window_size: ',self.window_size)
-        
+        x,xx = x        
         ##Edit Code End 5
         
         N, C, T, V = x.shape    # T = number of windows
@@ -130,65 +120,182 @@ class SpatialTemporal_MS_GCN(nn.Module):
         
         ##Edit Code Begin 6
         
+        ##Edit Code Begin 6
         #Calculate AlL DSG Matrix in All sample, all frame
+        
+        
+        ##Calculate DSG Matrix Method 1
+        # N_xx, C_xx, V_xx = xx.shape
+        # xx=xx.cuda()
+        # A_dsg_frame = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
+        # A_dsg_all = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
+        # #Sample each of people
+        # for sample in range(N_xx):
+        #     dim3d= torch.tensor(xx[sample, :, :]).T
+        #     dists = torch.cdist(dim3d,dim3d)
+        #     A_dsg_frame += dists
+                
+        #     #Temporal Pooling: GAP method
+        # A_dsg_frame = A_dsg_frame/sample
+        # A_dsg_all+=A_dsg_frame
+        #     # # Reset for the next sample
+        #     # A_dsg_frame.zero_()  
+        # A_dsg=A_dsg_all/N_xx
+        
+        ##Calculate DSG Matrix Method 2
+        # N_xx, C_xx, V_xx = xx.shape
+        
+        # A_dsg_frame = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
+        # A_dsg_all = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
+        # xx_reshaped = xx.permute(0, 2, 1).contiguous()  # Shape: (N_xx, V_xx, C_xx)
 
-        N_xx, C_xx, V_xx = xx.shape
-        xx=xx.cuda()
+        # # Compute the pairwise distances in a vectorized manner
+        # dists = torch.norm(xx_reshaped[:, :, None, :] - xx_reshaped[:, None, :, :], dim=-1)
 
-        A_dsg_frame = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
-        A_dsg_all = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
-        xx_reshaped = xx.permute(0, 2, 1).contiguous()  # Shape: (N_xx, V_xx, C_xx)
+        
+        
+        # # Sum the distances across all samples
+        # A_dsg_frame = dists.sum(dim=0) / N_xx
 
-        # Compute the pairwise distances in a vectorized manner
-        dists = torch.norm(xx_reshaped[:, :, None, :] - xx_reshaped[:, None, :, :], dim=-1)
+        # # Normalize by the number of samples
+        # A_dsg_all += A_dsg_frame
+        
+        # lamda=1
+        # A_dsg_all=torch.exp(-(A_dsg_all**2)/lamda)
+        
 
-        A_dsg=dists
+        # A_binary_with_I = A_dsg_all
+        # # Build spatial-temporal graph
+        # A_large = A_binary_with_I.repeat(self.window_size, self.window_size).clone()
+
+        # A = A_large
+
+        # # A_scales = [normalize_dsg_adjacency_matrix(A) for k in range(self.num_scales)]
+        # A_scales = [A for k in range(self.num_scales)]
+        
+        # # A_scales= A
+        # A_scales = [torch.matrix_power(g, k) for k, g in enumerate(A_scales)]
+        # A_scales = torch.cat(A_scales)
+
+        # self.A_scales = torch.Tensor(A_scales)
+
+        # A = self.A_scales.to(x.dtype).to(x.device)
+        
+        ##Calculate DSG Matrix Method 3
+        # N_xx, C_xx, V_xx = xx.shape
+        # # print("xx.shape: ",xx.shape)
+        # xx=xx.cuda()
+
+        # A_dsg_frame = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
+        # A_dsg_all = torch.zeros((25, 25), dtype=torch.float32).to(x.device)
+        # xx_reshaped = xx.permute(0, 2, 1).contiguous()  # Shape: (N_xx, V_xx, C_xx)
+
+        # # Compute the pairwise distances in a vectorized manner
+        # dists = torch.norm(xx_reshaped[:, :, None, :] - xx_reshaped[:, None, :, :], dim=-1)
+
+        # A_dsg=dists
+        
+        # lamda=1
+        # A_dsg_all=torch.exp(-(A_dsg**2)/lamda)
+        # A_dsg_all=A_dsg_all[None,None,:,:,:]
+        # # A_dsg_all=self.conv.to('cuda')(A_dsg_all)
+
+        # A_binary_with_I = A_dsg_all
+        
+        # A_large = torch.stack([i.repeat(self.window_size, self.window_size).clone() for i in A_binary_with_I[0,0]])
+        # A = A_large
+                
+        # n_x,v_x,_=A.shape
+        # A_scales=torch.zeros(n_x,self.num_scales,v_x,v_x)
+        # for i in range(len(A)):
+        #     for k in range(self.num_scales):
+        #         A_scales[i,k]=A[i]
+                
+        # A_list=torch.zeros(n_x,self.num_scales*v_x,v_x)
+        # for num in range(len(A_scales)):
+        #     A_list[num] = torch.cat([torch.matrix_power(g, k) for k, g in enumerate( A_scales[num] )])
+            
+        # A_scales=A_list    
+        # t_a, v_a, v_a2=A_scales.shape
+        
+        # A_scales=A_scales.reshape(1,1,t_a,v_a,v_a2)
+        
+
+        # self.A_scales = torch.Tensor(A_scales)
+        
+        # A = A_scales
+        # A = self.A_scales.to(x.dtype).to(x.device)
+        
+        # # print("A.shape: ",A.shape)
+        # res = self.residual(x)
+        # # _,_,n,_,_=A.shape
+        # n,_,_,_=x.shape
+                
+        # agg = torch.stack([torch.einsum('vu,ctu->ctv', A[0,0,i], x[i]) for i in range(n)])
+        
+        ##Calculate DSG Matrix Method 4
+        # print('xx.shape: ',xx.shape)
+        
+        N, C, T, V, M = xx.shape
+        xx_reshaped = xx.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
+        # xx_reshaped = torch.nn.BatchNorm1d(2 * 3 * self.num_point)(xx_reshaped)
+        xx_reshaped = xx_reshaped.view(N * M, V, C, T).permute(0,2,3,1).contiguous()
+        
+        
+        xx_reshaped = xx_reshaped.permute(0, 2, 3, 1).contiguous()  # Shape: (N_xx, T_xx, V_xx, C_xx)
+        
+        # print('xx_reshaped.shape: ',xx_reshaped.shape)
+        
+        dists = torch.norm(xx_reshaped[:, :, :,None, :] - xx_reshaped[:, :, None, :, :], dim=-1).to("cuda")
+        
+        # A_dsg = torch.zeros(N_xx, T_xx, V_xx, V_xx)
         
         lamda=1
-        A_dsg_all=torch.exp(-(A_dsg**2)/lamda)
-        A_dsg_all=A_dsg_all[None,None,:,:,:]
-        A_dsg_all=self.conv.to('cuda')(A_dsg_all)
-
-        A_binary_with_I = A_dsg_all
-        print("A_binary_with_I.shape: ",A_binary_with_I.shape)
         
-        A_large = torch.stack([i.repeat(self.window_size, self.window_size).clone() for i in A_binary_with_I[0,0]])
-        A = A_large
-
-        # A_scales = [normalize_dsg_adjacency_matrix(A) for k in range(self.num_scales)]
-        A_scales = [A for k in range(self.num_scales)]
-
+        A_dsg = torch.exp(-(dists**2)/lamda).to("cuda")
+        # print('A_dsg.shape: ',A_dsg.shape)
         
-        A_scales = torch.stack([A[i] for i in range(len(A)) for k in range(self.num_scales) ]) 
-
-        A_scales = A_scales[:,None,:,:]
-        A_scales = torch.stack([torch.matrix_power(g, k) for i in A_scales for k, g in enumerate(i)])
+        # A_large = A_dsg.clone()
         
-        # if torch.isnan(A_scales).any()==True :
-        #     print(torch.isnan(A_scales).any())
-        #     print("A_scales: ", A_scales)
-        #     return 0
-
-        t_a, v_a, v_a2=A_scales.shape
+        A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).clone()  for t in i]) for i in A_dsg]).to("cuda")
         
-        A_scales=A_scales.reshape(1,1,t_a,v_a,v_a2)
         
-
-        self.A_scales = torch.Tensor(A_scales)
+        N_xx, T_xx, V_xx, _= A_dsg.shape
         
-        A = A_scales
-        A = self.A_scales.to(x.dtype).to(x.device)
+        A_scales = torch.zeros(N_xx,T_xx,self.num_scales,A_large.shape[2],A_large.shape[3]).to("cuda")
         
-        # print("A.shape: ",A.shape)
+        for k in range(self.num_scales):
+            A_scales[:,:, k] = A_large[:,:]
+        # print("A_scales.shape: ", A_scales.shape)
+        
+        # A_list = torch.zeros(N_xx,T_xx,self.num_scales*A_large.shape[2],A_large.shape[2], device = x.device)
+        
+        # for N in range(N_xx):
+        #     for F in range(T_xx):
+        A_list = torch.stack([torch.stack([torch.cat([torch.matrix_power(g, k).to("cuda") for k, g in enumerate( A_scales[N,F] )]) for F in range(T_xx)]).to("cuda") for N in range (N_xx)]).to("cuda")
+        
+        # print('A_list.shape: ',A_list.shape)
+        # print('x.shape: ',x.shape)
+        
         res = self.residual(x)
-        _,_,n,_,_=A.shape
-
-        agg = torch.stack([torch.einsum('vu,ctu->ctv', A[0,0,i], x[i]) for i in range(n)])
+        agg = torch.einsum('ntvu,ncfu->ncfv', A_list, x)
+        
+        
+        N, C, T, V = x.shape    # T = number of windows
+        
+        
+        
+        
+        
+        
         ##Edit Code End 6
 
         # Perform Graph Convolution
+        #Origin Code Begin
         # res = self.residual(x)
-        # agg = torch.einsum('nvu,nctu->nctv', A[0,0], x)
+        # agg = torch.einsum('vu,nctu->nctv', A, x)
+        
+        #Origin Code End
         agg = agg.view(N, C, T, self.num_scales, V)
         agg = agg.permute(0,3,1,2,4).contiguous().view(N, self.num_scales*C, T, V)
         out = self.mlp(agg)

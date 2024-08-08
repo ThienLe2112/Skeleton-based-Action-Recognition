@@ -32,7 +32,7 @@ phase: train
 print_log: true
 save_interval: 1
 save_score: false
-seed: 131
+seed: 105
 show_topk:
 - 1
 - 5

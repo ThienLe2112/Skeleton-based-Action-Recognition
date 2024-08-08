@@ -196,7 +196,7 @@ class Model(nn.Module):
     def forward(self, x):
         N, C, T, V, M = x.size()
         ##Edit Code Begin 3
-        # xx= torch.clone(x)
+        xx= torch.clone(x)
         ##Edit Code End 3
 
         x = x.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
@@ -205,8 +205,8 @@ class Model(nn.Module):
         x = x.view(N * M, V, C, T).permute(0,2,3,1).contiguous()
         
         ##Edit Code Begin 13
-        xxx_1=torch.clone(x)
-        xx = xxx_1.permute(0,2,1,3).contiguous().view(N * M * T, C, V)
+        # xxx_1=torch.clone(x)
+        # xx = xxx_1.permute(0,2,1,3).contiguous().view(N * M * T, C, V)
         # xx = xxx_1
 
 
