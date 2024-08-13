@@ -3,6 +3,7 @@
 .idea/
 runs/
 work_dir/
+workdir/
 
 ### Python template
 # Byte-compiled / optimized / DLL files
@@ -110,3 +111,6 @@ venv.bak/
 
 # ignore .skeleton files
 *.skeleton
+
+# mkdocs documentation
+/csv
