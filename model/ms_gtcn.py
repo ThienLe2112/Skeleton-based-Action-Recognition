@@ -112,7 +112,7 @@ class SpatialTemporal_MS_GCN(nn.Module):
         x,xx = x        
         ##Edit Code End 5
         
-        N, C, T, V = x.shape    # T = number of windows
+        # N, C, T, V = x.shape    # T = number of windows
         
         # print('xx.shape: ', xx.shape)
         # Build graphs
@@ -125,57 +125,51 @@ class SpatialTemporal_MS_GCN(nn.Module):
         
         ##Edit Code Begin 6
         
-        ##Calculate DSG Matrix Method 4
+        ##Calculate DSG Matrix Method 5
         
         N, C, T, V, M = xx.shape
         xx_reshaped = xx.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
+        # xx_reshaped = torch.nn.BatchNorm1d(2 * 3 * self.num_point)(xx_reshaped)
         xx_reshaped = xx_reshaped.view(N * M, V, C, T).permute(0,2,3,1).contiguous()
         
         
         xx_reshaped = xx_reshaped.permute(0, 2, 3, 1).contiguous()  # Shape: (N_xx, T_xx, V_xx, C_xx)
         
+        # print('xx_reshaped.shape: ',xx_reshaped.shape)
         
         dists = torch.norm(xx_reshaped[:, :, :,None, :] - xx_reshaped[:, :, None, :, :], dim=-1).to("cuda")
         
+        # A_dsg = torch.zeros(N_xx, T_xx, V_xx, V_xx)
+        
         lamda=1
         
-        A_dsg = torch.exp(-(dists**2)/lamda).to("cuda")
-
+        A_dsg = torch.exp(-(dists**2)/lamda).to("cuda") #Shape: N, T, V, V
         A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).clone()  for t in i]) for i in A_dsg]).to("cuda")
+        N_xx, T_xx, V_xx, _= A_large.shape
         
         
-        N_xx, T_xx, V_xx, _= A_dsg.shape
         
-        # Single Scale
-        # A_scales = torch.zeros(N_xx,T_xx,self.num_scales,A_large.shape[2],A_large.shape[3]).to("cuda")
-
-        # print("A_scale.shape: ", A_scales.shape)
-
+        
+        # A_scales = torch.zeros( N_xx, T_xx, self.num_scales*V_xx, V_xx)
+        
         # for k in range(self.num_scales):
-        #     A_scales[:,:, k] = A_large[:,:]
-
-        # print("self.A_scale.shape: ", self.A_scales.shape)
-
-        # A_list = torch.stack([torch.stack([torch.cat([torch.matrix_power(g, k).to("cuda") 
-        #                                                 for k, g in enumerate( A_scales[N,F] )]) 
-        #                                                     for F in range(T_xx)]).to("cuda") 
-        #                                                         for N in range (N_xx)]).to("cuda")
+        A_scales = torch.cat([A_large for k in range(self.num_scales)], dim = 2).to("cuda")
+        # A_scales = A_large.repeat( N_xx, T_xx, self.num_scales, 1)
         
+        # A_Mask = torch.stack([torch.stack([self.A_scales for F in range(T_xx)]).to("cuda") for NN in range(N_xx)]).to("cuda")
+        
+        
+        # A_Mask = self.A_scales.repeat( N_xx, T_xx, 1, 1).to("cuda")
+        
+        
+        
+        #Multi_scale
+        # A_list = torch.mul(A_scales ,A_Mask).to("cuda")
+        
+        #Non_Scale
+        
+        A_list = A_scales
 
-        # Multi Scale
-        A_scales = torch.zeros(N_xx,T_xx,self.num_scales,A_large.shape[2],A_large.shape[3]).to("cuda")
-
-        # print("A_scale.shape: ", A_scales.shape)
-
-        for k in range(self.num_scales):
-            A_scales[:,:, k] = A_large[:,:]
-        # A_scales = torch.stack([torch.stack([torch.cat([A_scales[N,F]])])])
-        # print("torch.cat(A_scales[0,0]).shape: ", torch.cat([A_scales[0,0,k ] for k in range(self.num_scales)]).shape)
-
-        A_list = torch.stack([torch.stack([torch.cat([torch.matrix_power(g, k).to("cuda") 
-                                                        for k, g in enumerate( A_scales[N,F] )]) * self.A_scales.to("cuda")
-                                                            for F in range(T_xx)]).to("cuda") 
-                                                                for N in range (N_xx)]).to("cuda")
         # import seaborn as sns
         # import pandas as pd
         # import matplotlib.pyplot as plt
