@@ -159,31 +159,36 @@ class SpatialTemporal_MS_GCN(nn.Module):
         # A_Mask = torch.stack([torch.stack([self.A_scales for F in range(T_xx)]).to("cuda") for NN in range(N_xx)]).to("cuda")
         
         
-        # A_Mask = self.A_scales.repeat( N_xx, T_xx, 1, 1).to("cuda")
+        A_Mask = self.A_scales.repeat( N_xx, T_xx, 1, 1).to("cuda")
         
+        # print("A_Mask.shape: ", A_Mask.shape)
+        # print("A_scales.shape: ", A_scales.shape)
+
         
         
         #Multi_scale
-        # A_list = torch.mul(A_scales ,A_Mask).to("cuda")
+        A_list = torch.mul(A_scales ,A_Mask).to("cuda")
         
+        ####################################### PLOT MODEL
+        import seaborn as sns
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        for t in range(self.num_scales):
+            # t = 6 # t= 0, 3, 6, 9 
+            px = pd.DataFrame(A_Mask[0,0,t*3*25:(t*3+1)*25,0:25].cpu().numpy())
+            # print(px)
+            # # glue = sns.load_dataset("glue").pivot(index="Model", columns="Task", values="Score")
+            sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True)
+            plt.title(f'A_dsg({t})')
+            plt.show()
+        return
+        #######################################
+
         #Non_Scale
         
-        A_list = A_scales
+        # A_list = A_scales
 
-        # import seaborn as sns
-        # import pandas as pd
-        # import matplotlib.pyplot as plt
 
-        # for i in range(100):
-        #     lamda=i
-        #     A_dsg_all=torch.exp(-(A_dsg**2)/lamda)
-        #     px = pd.DataFrame(A_dsg_all.cpu().numpy())
-        #     print(px)
-        #     # # glue = sns.load_dataset("glue").pivot(index="Model", columns="Task", values="Score")
-        #     sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True)
-        #     plt.title(f'L = {i}')
-        #     plt.show()
-        
         res = self.residual(x)
         agg = torch.einsum('ntvu,ncfu->ncfv', A_list, x)
         
