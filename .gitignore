@@ -114,3 +114,6 @@ venv.bak/
 
 # mkdocs documentation
 /csv
+
+# ignore test file
+transformer.py

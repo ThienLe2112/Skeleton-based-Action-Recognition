@@ -9,7 +9,7 @@ import numpy as np
 from model.ms_tcn import MultiScale_TemporalConv as MS_TCN
 from model.mlp import MLP
 from model.activation import activation_factory
-from graph.tools import k_adjacency, normalize_adjacency_matrix, normalize_dsg_adjacency_matrix
+from graph.tools import k_adjacency, normalize_adjacency_matrix, normalize_dsg_A_tilta, normalize_adjacency_matrix_cuda
 
 import pandas as pd
 
@@ -59,15 +59,25 @@ class SpatialTemporal_MS_GCN(nn.Module):
         A = self.build_spatial_temporal_graph(A_binary, window_size)
 
         #Edit Code Begin 15
+        # num_scales = num_scales - 1
         self.conv = torch.nn.Conv3d(1,1,(300,3,3),padding=(0,1,1),stride=(300,1,1))
         #Edit Code End 15
         if disentangled_agg:
-            A_scales = [k_adjacency(A, k, with_self=True) for k in range(num_scales)]
+            #Edit Code Begin 18
+            if num_scales == 1:
+                
+                A_scales = torch.stack([torch.from_numpy(k_adjacency(A, k, with_self=True)) for k in range(num_scales)]).to("cuda")
+                # A_scales = [k_adjacency(A, k, with_self=True) for k in range(num_scales)]
+            else:
+                A_scales = torch.stack([k_adjacency(A, k, with_self=True) for k in range(num_scales - 1)]).to("cuda")
+            A_scales = torch.cat([normalize_adjacency_matrix_cuda(g) for g in A_scales]).to("cuda")
             # A_scales = np.concatenate([normalize_adjacency_matrix(g) for g in A_scales])
-            A_scales = np.concatenate([g for g in A_scales])
-
-            # print('A_scales: ',pd.DataFrame(A_scales))
-            # pd.DataFrame(A_scales).to_csv("./csv/A_scale.csv")
+            #Edit Code End 18
+            
+            #Original Code Begin
+            # A_scales = [k_adjacency(A, k, with_self=True) for k in range(num_scales)]
+            # A_scales = np.concatenate([g for g in A_scales])
+            #Original Code End
         else:
             # Self-loops have already been included in A
             # print(A)
@@ -75,7 +85,7 @@ class SpatialTemporal_MS_GCN(nn.Module):
             A_scales = [np.linalg.matrix_power(g, k) for k, g in enumerate(A_scales)]
             A_scales = np.concatenate(A_scales)
 
-        self.A_scales = torch.Tensor(A_scales)
+        self.A_scales = torch.Tensor(A_scales).to("cuda")
         self.V = len(A_binary)
 
         if use_Ares:
@@ -109,7 +119,7 @@ class SpatialTemporal_MS_GCN(nn.Module):
 
     def forward(self, x):
         ##Edit Code Begin 5
-        x,xx = x        
+        x,xx = x      
         ##Edit Code End 5
         
         # N, C, T, V = x.shape    # T = number of windows
@@ -129,64 +139,70 @@ class SpatialTemporal_MS_GCN(nn.Module):
         
         N, C, T, V, M = xx.shape
         xx_reshaped = xx.permute(0, 4, 3, 1, 2).contiguous().view(N, M * V * C, T)
-        # xx_reshaped = torch.nn.BatchNorm1d(2 * 3 * self.num_point)(xx_reshaped)
         xx_reshaped = xx_reshaped.view(N * M, V, C, T).permute(0,2,3,1).contiguous()
         
         
         xx_reshaped = xx_reshaped.permute(0, 2, 3, 1).contiguous()  # Shape: (N_xx, T_xx, V_xx, C_xx)
         
-        # print('xx_reshaped.shape: ',xx_reshaped.shape)
+        xx_reshaped = xx_reshaped.cuda(non_blocking = True)
         
-        dists = torch.norm(xx_reshaped[:, :, :,None, :] - xx_reshaped[:, :, None, :, :], dim=-1).to("cuda")
+        dists = torch.norm(xx_reshaped[:, :, :,None, :] - xx_reshaped[:, :, None, :, :], dim=-1).to("cuda")#Shape: N, T, V, V
         
-        # A_dsg = torch.zeros(N_xx, T_xx, V_xx, V_xx)
         
         lamda=1
-        
         A_dsg = torch.exp(-(dists**2)/lamda).to("cuda") #Shape: N, T, V, V
-        A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).clone()  for t in i]) for i in A_dsg]).to("cuda")
-        N_xx, T_xx, V_xx, _= A_large.shape
+        # A_dsg = dists
+        
+        # normalize_dsg_A_tilta
+        A_norm = normalize_dsg_A_tilta(A_dsg)
+        # A_norm = normalize_dsg_adjacency_matrix(A_dsg)
         
         
         
+        # A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).clone()  for t in i]) for i in A_norm]).to("cuda")
+        A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).to("cuda").clone()  
+                                            for t in i]).to("cuda") 
+                                                for i in A_norm]).to("cuda")
+        if self.num_scales == 1:
+            A_scales = torch.cat([A_large for k in range(self.num_scales )], dim = 2).to("cuda")
+        else:
+            A_scales = torch.cat([A_large for k in range(self.num_scales - 1 )], dim = 2).to("cuda")
         
-        # A_scales = torch.zeros( N_xx, T_xx, self.num_scales*V_xx, V_xx)
-        
-        # for k in range(self.num_scales):
-        A_scales = torch.cat([A_large for k in range(self.num_scales)], dim = 2).to("cuda")
-        # A_scales = A_large.repeat( N_xx, T_xx, self.num_scales, 1)
-        
-        # A_Mask = torch.stack([torch.stack([self.A_scales for F in range(T_xx)]).to("cuda") for NN in range(N_xx)]).to("cuda")
-        
-        
-        A_Mask = self.A_scales.repeat( N_xx, T_xx, 1, 1).to("cuda")
-        
-        # print("A_Mask.shape: ", A_Mask.shape)
-        # print("A_scales.shape: ", A_scales.shape)
-
-        
+        # print("Self.num_scales: ", self.num_scales)
         
         #Multi_scale
-        A_list = torch.mul(A_scales ,A_Mask).to("cuda")
-        
+        if self.num_scales !=1:
+            #Method 1: only dsg K-adjacency
+            # N_xx, T_xx, V_xx, _= A_large.shape
+            # A_Mask = self.A_scales.repeat( N_xx, T_xx, 1, 1)
+            # A_list = torch.mul(A_scales ,A_Mask.to("cuda")).to("cuda")
+            
+            #Method 2: Adsg + dsg K-adjacency
+            N_xx, T_xx, V_xx, _= A_large.shape
+            A_Mask = self.A_scales.repeat( N_xx, T_xx, 1, 1).to("cuda")
+            A_list = torch.mul(A_scales ,A_Mask.to("cuda")).to("cuda")
+            A_comb = torch.cat((A_scales[:,:,0:V_xx], A_list), dim = 2).to("cuda")
+            A_list = A_comb
+        else:
+            
+            #Non_Scale
+            
+            A_list = A_scales
         ####################################### PLOT MODEL
-        import seaborn as sns
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        for t in range(self.num_scales):
-            # t = 6 # t= 0, 3, 6, 9 
-            px = pd.DataFrame(A_Mask[0,0,t*3*25:(t*3+1)*25,0:25].cpu().numpy())
-            # print(px)
-            # # glue = sns.load_dataset("glue").pivot(index="Model", columns="Task", values="Score")
-            sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True)
-            plt.title(f'A_dsg({t})')
-            plt.show()
-        return
+        # import seaborn as sns
+        # import pandas as pd
+        # import matplotlib.pyplot as plt
+        # for t in range(self.num_scales):
+        #     # t = 6 # t= 0, 3, 6, 9 
+        #     px = pd.DataFrame(A_list[0,0,t*3*25:(t*3+1)*25,0:25].cpu().numpy())
+        #     # print(px)
+        #     # # glue = sns.load_dataset("glue").pivot(index="Model", columns="Task", values="Score")
+        #     sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True)
+        #     plt.title(f'A_dsg({t})')
+        #     plt.show()
+        # return
         #######################################
 
-        #Non_Scale
-        
-        # A_list = A_scales
 
 
         res = self.residual(x)
@@ -198,6 +214,8 @@ class SpatialTemporal_MS_GCN(nn.Module):
         
         
         
+        agg = agg.view(N, C, T, self.num_scales, V)
+        agg = agg.permute(0,3,1,2,4).contiguous().view(N, self.num_scales*C, T, V)
         
         
         ##Edit Code End 6
@@ -208,8 +226,8 @@ class SpatialTemporal_MS_GCN(nn.Module):
         # agg = torch.einsum('vu,nctu->nctv', A, x)
         
         #Origin Code End
-        agg = agg.view(N, C, T, self.num_scales, V)
-        agg = agg.permute(0,3,1,2,4).contiguous().view(N, self.num_scales*C, T, V)
+        # agg = agg.view(N, C, T, self.num_scales, V)
+        # agg = agg.permute(0,3,1,2,4).contiguous().view(N, self.num_scales*C, T, V)
         out = self.mlp(agg)
         out += res
         return self.act(out)
