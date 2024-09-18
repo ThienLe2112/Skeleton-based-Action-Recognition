@@ -24,6 +24,11 @@ from utils import count_params, import_class
 
 from torch.utils.data import RandomSampler
 
+from arg_types import arg_boolean, arg_dict
+
+name_exp = 'prova20'
+
+
 def init_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.manual_seed(seed)
@@ -214,6 +219,53 @@ def get_parser():
         default=False,
         help='Debug mode; default false')
 
+    #Transformer begin 2
+    parser.add_argument('--val_split', type=int, default=0.2)
+    parser.add_argument('--data_dir', type=str)
+    parser.add_argument('--log_dir', type=str)
+    parser.add_argument('--exp_name', type=str, default=name_exp)
+
+    parser.add_argument('--clip_grad_norm', type=float, default=0.5)
+    parser.add_argument('--writer_enabled', type=arg_boolean, default=True)
+    parser.add_argument('--gcn0_flag', type=arg_boolean, default=False)
+    parser.add_argument('--scheduling_lr', type=arg_boolean, default=True)
+    parser.add_argument('--complete', type=arg_boolean, default=True)
+    parser.add_argument('--bn_flag', type=arg_boolean, default=True)
+    parser.add_argument('--accumulating_gradients', type=arg_boolean, default=True)
+    parser.add_argument('--optimize_every', type=int, default=2)
+    parser.add_argument('--clip', type=arg_boolean, default=False)
+    parser.add_argument('--validation_split', type=arg_boolean, default=False)
+    parser.add_argument('--data_mirroring', type=arg_boolean, default=False)
+    parser.add_argument('--local_rank', type=int, default=0)
+
+    parser.add_argument(
+        '--training', type=str2bool, default=True, help='training or testing mode')
+
+    parser.add_argument(
+        '--feeder_augmented', default='feeder.feeder_augmented', help='data loader will be used')
+
+    parser.add_argument(
+        '--train_feeder_args_new',
+        default=dict(),
+        help='the arguments of data loader for training')
+    parser.add_argument(
+        '--test_feeder_args_new',
+        default=dict(),
+        help='the arguments of data loader for test')
+    parser.add_argument(
+        '--scheduler', type=float, default=0, help='initial learning rate')
+
+    parser.add_argument(
+        '--display_by_category',
+        type=str2bool,
+        default=False,
+        help='if ture, the top k accuracy by category  will be displayed')
+    parser.add_argument(
+        '--display_recall_precision',
+        type=str2bool,
+        default=False,
+        help='if ture, recall and precision by category  will be displayed')
+    #Transformer end 2
     return parser
 
 

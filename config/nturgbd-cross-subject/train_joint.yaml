@@ -37,12 +37,46 @@ model_args:
   num_point: 25
   num_person: 2
   num_gcn_scales: 13    
-  num_g3d_scales: 6
+  num_g3d_scales: 1
+  channel: 6
+  mask_learning: True
+  use_data_bn: True
+  attention: True
+  only_attention: True
+  tcn_attention: False
+  data_normalization: True
+  skip_conn: True
+  weight_matrix: 2
+  only_temporal_attention: True
+  bn_flag: True
+  attention_3: False
+  kernel_temporal: 9
+  more_channels: False
+  double_channel: True
+  drop_connect: True
+  concat_original: True
+  all_layers: False
+  adjacency: False
+  agcn: False
+  dv: 0.25
+  dk: 0.25
+  Nh: 8
+  n: 4
+  dim_block1: 10
+  dim_block2: 30
+  dim_block3: 75
+  device: [0]
+  relative: False
+  visualization: False
   graph: graph.ntu_rgb_d.AdjMatrixGraph
+  # graph_args:
+  #   labeling_mode: 'spatial'
 ##Edit Code End 12
 
 
 # optim
+scheduler: 1
+
 weight_decay: 0.0005
 base_lr: 0.05
 step: [30, 40]
@@ -50,8 +84,8 @@ step: [30, 40]
 # training
 num_epoch: 50
 device: [0]
-batch_size: 8
-forward_batch_size: 4
-test_batch_size: 8
+batch_size: 2
+forward_batch_size: 1
+test_batch_size: 2
 nesterov: True
 

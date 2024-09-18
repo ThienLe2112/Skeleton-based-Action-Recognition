@@ -39,18 +39,43 @@ def k_adjacency(A, k, with_self=False, self_factor=1):
     return Ak
 
 
+
 def normalize_adjacency_matrix(A):
     node_degrees = A.sum(-1)
     degs_inv_sqrt = np.power(node_degrees, -0.5)
+    # print("degs_inv_sqrt: ", degs_inv_sqrt)
     norm_degs_matrix = np.eye(len(node_degrees)) * degs_inv_sqrt
+    # print("norm_degs_matrix: ", norm_degs_matrix)
     return (norm_degs_matrix @ A @ norm_degs_matrix).astype(np.float32)
 
 ##Edit Code Begin 7
-def normalize_dsg_adjacency_matrix(A):
-    node_degrees = A.sum(-1)
-    degs_inv_sqrt = torch.pow(node_degrees, -0.5)
-    norm_degs_matrix = torch.diag(degs_inv_sqrt)
+def normalize_adjacency_matrix_cuda(A):
+    node_degrees = A.sum(-1).to("cuda")
+    degs_inv_sqrt = torch.pow(node_degrees, -0.5).to("cuda")
+    norm_degs_matrix = torch.eye(len(node_degrees)).to("cuda") * degs_inv_sqrt
+    
     return (norm_degs_matrix @ A @ norm_degs_matrix).float()
+
+def normalize_dsg_adjacency_matrix(A):
+    node_degrees = A.sum(-1).to("cuda")
+    degs_inv_sqrt = torch.pow(node_degrees, -0.5).to("cuda")
+    # print("degs_inv_sqrt.shape: ", degs_inv_sqrt.shape)
+    # norm_degs_matrix = torch.diag(degs_inv_sqrt)
+    norm_degs_matrix = torch.stack([torch.stack([ torch.eye(node_degrees.shape[-1]).to("cuda")* degs_inv_sqrt[n][t] 
+                                                for t in range(degs_inv_sqrt.shape[1])]).to("cuda")
+                                                    for n in range(degs_inv_sqrt.shape[0])]).to("cuda")
+    return (norm_degs_matrix @ A @ norm_degs_matrix).float()
+
+def normalize_dsg_A_tilta(A):
+    # node_degrees = A.to("cpu").sum(-1)
+    node_degrees = A.to("cuda").sum(-1)
+    degs_inv= torch.pow(node_degrees, -1).to("cuda")
+    # print("degs_inv.shape: ", degs_inv.shape)
+    # print(degs_inv[0,0])
+    norm_degs_matrix = torch.stack([torch.stack([ torch.eye(node_degrees.shape[-1]).to("cuda")* degs_inv[n][t] 
+                                                for t in range(degs_inv.shape[1])]) .to("cuda")
+                                                    for n in range(degs_inv.shape[0])]).to("cuda")
+    return (A @ norm_degs_matrix).float()
 
 ##Edit Code End 7
 
