@@ -17,7 +17,7 @@ class Unit2D(nn.Module):
                  bias=True):
         super(Unit2D, self).__init__()
         pad = int((kernel_size - 1) / 2)
-        print("Pad Temporal ", pad)
+        # print("Pad Temporal ", pad)
 
         if dim == 2:
             self.conv = nn.Conv2d(
@@ -28,7 +28,7 @@ class Unit2D(nn.Module):
                 stride=(stride, 1),
                 bias=bias)
         elif dim == 3:
-            print("Pad Temporal ", pad)
+            # print("Pad Temporal ", pad)
             self.conv = nn.Conv2d(
                 D_in,
                 D_out,

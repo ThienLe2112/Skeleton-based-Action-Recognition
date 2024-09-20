@@ -34,10 +34,10 @@ model_args:
   adjacency: false
   agcn: false
   all_layers: false
-  attention: true
+  attention: false
   attention_3: false
   bn_flag: true
-  channel: 6
+  channel: 3
   concat_original: true
   data_normalization: true
   device:
@@ -63,7 +63,7 @@ model_args:
   only_temporal_attention: true
   relative: false
   skip_conn: true
-  tcn_attention: false
+  tcn_attention: true
   use_data_bn: true
   visualization: false
   weight_matrix: 2
@@ -80,7 +80,7 @@ save_interval: 1
 save_score: false
 scheduler: 1
 scheduling_lr: true
-seed: 11
+seed: 58
 show_topk:
 - 1
 - 5

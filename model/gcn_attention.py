@@ -34,9 +34,9 @@ class gcn_unit_attention(nn.Module):
         self.skip_conn=skip_conn
         self.num_point=num_point
         self.adjacency = adjacency
-        print("Nh ", Nh)
-        print("Dv ", dv_factor)
-        print("Dk ", dk_factor)
+        # print("Nh ", Nh)
+        # print("Dv ", dv_factor)
+        # print("Dk ", dk_factor)
 
         self.last_graph = last_graph
         if (not only_attention):

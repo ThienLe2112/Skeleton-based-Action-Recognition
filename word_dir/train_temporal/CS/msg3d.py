@@ -178,6 +178,8 @@ class Model(nn.Module):
         Graph = import_class(graph)
         A_binary = Graph().A_binary
         self.data_bn = nn.BatchNorm1d(num_person * in_channels * num_point)
+        self.conv2l = torch.nn.Conv3d(2,2,(4,1,1),padding=(0,0,0),stride=(4,1,1))
+
         #Transformer Begin 1
         self.num_class = num_class
         self.use_data_bn = use_data_bn
@@ -257,7 +259,9 @@ class Model(nn.Module):
 
             ## Transformer trong đây nhưng không dùng MS
             ## Nên không quan tâm thằng này
-            unit = TCN_GCN_unit_multiscale
+            # unit = TCN_GCN_unit_multiscale
+            pass
+
         else:
             ## Tk này mới cần quan tâm này
             unit = TCN_GCN_unit
@@ -338,6 +342,12 @@ class Model(nn.Module):
         c1 = 96
         c2 = c1 * 2     # 192
         c3 = c2 * 2     # 384
+        #transformer
+        self.sgcnT = nn.Sequential(
+            MS_GCN(num_gcn_scales, 128, 384, A_binary, disentangled_agg=True),
+            MS_TCN(384, 384),
+            MS_TCN(384, 384))
+
 
         # r=3 STGC blocks
         self.gcn3d1 = MultiWindow_MS_G3D(3, c1, A_binary, num_g3d_scales, window_stride=1)
@@ -357,6 +367,10 @@ class Model(nn.Module):
         self.tcn2 = MS_TCN(c2, c2)
 
         self.gcn3d3 = MultiWindow_MS_G3D(c2, c3, A_binary, num_g3d_scales, window_stride=2)
+        # self.sgcn3 = nn.Sequential(
+        #     MS_GCN(num_gcn_scales, c2, c2, A_binary, disentangled_agg=True),
+        #     MS_TCN(c2, c3, stride=2),
+        #     MS_TCN(c3, c3))
         self.sgcn3 = nn.Sequential(
             MS_GCN(num_gcn_scales, c2, c2, A_binary, disentangled_agg=True),
             MS_TCN(c2, c3, stride=2),
@@ -366,7 +380,8 @@ class Model(nn.Module):
 
         self.fc = nn.Linear(c3, num_class)
 
-    def forward(self, x):
+    def forward(self, x, label, name):
+    # def forward(self, x):
         N, C, T, V, M = x.size()
         ##Edit Code Begin 3
         
@@ -378,7 +393,7 @@ class Model(nn.Module):
         # print("x.shape: ", x.shape)
         x = self.data_bn(x)
         x = x.view(N * M, V, C, T).permute(0,2,3,1).contiguous()
-        
+        x_coord = torch.clone(x)
         ##Edit Code Begin 13
         
         
@@ -397,12 +412,36 @@ class Model(nn.Module):
         x = F.relu(self.sgcn2(x) + self.gcn3d2([x,xx]), inplace=True)
         x = self.tcn2(x)
         # print("x2.shape: ", x.shape)
-
         x = F.relu(self.sgcn3(x) + self.gcn3d3([x,xx]), inplace=True)
         x = self.tcn3(x)
-        # print("x3.shape: ", x.shape)
 
-        
+
+
+        # x = self.conv2l(x)
+        # x = self.sgcnT(x)
+
+
+        x_trans = self.gcn0(x_coord, label, name)
+        x_trans = self.tcn0(x_trans)
+
+        for i, m in enumerate(self.backbone):
+            if i == 3 and self.concat_original:
+                x_trans = m(torch.cat((x_trans, x_coord), dim=1), label, name)
+            else:
+                x_trans = m(x_trans, label, name)
+
+        x_trans = self.conv2l(x_trans)
+        x_trans = self.sgcnT(x_trans)
+        x = F.relu(x + x_trans.detach(), inplace=True)
+        # x_trans = F.avg_pool2d(x_trans, kernel_size=(1, V))
+        # print("x_trans.shape: ", x_trans.shape)
+        # print("STGC x.shape: ", x.shape)
+        # print(x)
+        # x_trans = F.relu(x_trans)
+        # x = x + x_trans
+        # print(x_trans)
+        # x = x + x_trans
+        # x = F.relu(x + x_trans, inplace=True)
         ##Edit Code End 4
 
         ##Original Code Begin
@@ -414,20 +453,18 @@ class Model(nn.Module):
         #
         # x = F.relu(self.sgcn3(x) + self.gcn3d3(x), inplace=True)
         # x = self.tcn3(x)
+        
         ##Original Code End
+
 
         out = x
         out_channels = out.size(1)
         out = out.view(N, M, out_channels, -1)
-        # print("out1.shape: ", out.shape)
         out = out.mean(3)   # Global Average Pooling (Spatial+Temporal)
-        # print("out2.shape: ", out.shape)
-        
         out = out.mean(1)   # Average pool number of bodies in the sequence
-        # print("out3.shape: ", out.shape)
-
         out = self.fc(out)
-        # print("out4.shape: ", out.shape)
+        
+
         
         return out
 

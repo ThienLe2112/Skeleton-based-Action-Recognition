@@ -566,9 +566,10 @@ class Processor():
                 # forward
                 ##Edit Code Begin 10
                 # print('batch_data.shape: ',batch_data.shape)
+                # index = index[0]
+                output = self.model(batch_data,label, index)
                 ##Edit Code End 10
-
-                output = self.model(batch_data)
+                # output = self.model(batch_data)
 
                 if isinstance(output, tuple):
                     output, l1 = output

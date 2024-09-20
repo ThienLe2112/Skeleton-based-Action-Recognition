@@ -47,6 +47,7 @@ class unit_gcn(nn.Module):
             nn.Conv2d(
                 self.in_channels,
                 self.out_channels,
+                # self.out_channels,
                 kernel_size=(kernel_size, 1),
                 padding=(int((kernel_size - 1) / 2), 0),
                 stride=(stride, 1)) for i in range(self.num_A)
@@ -73,10 +74,11 @@ class unit_gcn(nn.Module):
         # reweight adjacency matrix
         if self.mask_learning:
             A = A*self.mask
-
+        # print("A.shape: ", A.shape)
         # graph convolution
-        for i,ko, a in enumerate(A):
+        for i, a in enumerate(A):
             xa = x.reshape(-1, V).mm(a).reshape(N, C, T, V)
+            # print("xa.shape: ", xa.shape)
 
             if i == 0:
                 y = self.conv_list[i](xa)

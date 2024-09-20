@@ -38,12 +38,13 @@ model_args:
   num_person: 2
   num_gcn_scales: 13    
   num_g3d_scales: 1
-  channel: 6
+  # channel: 6
+  channel: 3
   mask_learning: True
   use_data_bn: True
-  attention: True
+  attention: False
   only_attention: True
-  tcn_attention: False
+  tcn_attention: True
   data_normalization: True
   skip_conn: True
   weight_matrix: 2
