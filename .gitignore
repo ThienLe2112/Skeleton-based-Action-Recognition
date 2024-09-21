@@ -3,6 +3,7 @@
 .idea/
 runs/
 work_dir/
+word_dir/
 workdir/
 
 ### Python template
