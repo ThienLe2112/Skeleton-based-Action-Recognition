@@ -179,6 +179,7 @@ class Model(nn.Module):
         A_binary = Graph().A_binary
         self.data_bn = nn.BatchNorm1d(num_person * in_channels * num_point)
         self.conv2l = torch.nn.Conv3d(2,2,(4,1,1),padding=(0,0,0),stride=(4,1,1))
+        self.convOut = torch.nn.Conv3d(75,300,(3,1,1),padding=(0,0,0),stride=(3,1,1))
 
         #Transformer Begin 1
         self.num_class = num_class
@@ -416,14 +417,18 @@ class Model(nn.Module):
         x = self.tcn3(x)
 
 
+        x = x.permute(2,1,0,3).contiguous()
+        x = self.convOut(x)
+        x = x.permute(2,1,0,3).contiguous()
 
-        # x = self.conv2l(x)
         # x = self.sgcnT(x)
 
 
-        x_trans = self.gcn0(x_coord, label, name)
-        x_trans = self.tcn0(x_trans)
-
+        # x_trans = self.gcn0(x_coord, label, name)
+        # x_trans = self.tcn0(x_trans)
+        # print("x_trans.shape: ", x_trans.shape)
+        x_trans = x
+        print("x.shape: ", x.shape)
         for i, m in enumerate(self.backbone):
             if i == 3 and self.concat_original:
                 x_trans = m(torch.cat((x_trans, x_coord), dim=1), label, name)
@@ -432,16 +437,9 @@ class Model(nn.Module):
 
         x_trans = self.conv2l(x_trans)
         x_trans = self.sgcnT(x_trans)
-        x = F.relu(x + x_trans.detach(), inplace=True)
-        # x_trans = F.avg_pool2d(x_trans, kernel_size=(1, V))
-        # print("x_trans.shape: ", x_trans.shape)
-        # print("STGC x.shape: ", x.shape)
-        # print(x)
-        # x_trans = F.relu(x_trans)
-        # x = x + x_trans
-        # print(x_trans)
-        # x = x + x_trans
-        # x = F.relu(x + x_trans, inplace=True)
+
+        # x = F.relu(x + x_trans.detach(), inplace=True)
+        x = F.relu(x_trans.detach() ,inplace=True)
         ##Edit Code End 4
 
         ##Original Code Begin
