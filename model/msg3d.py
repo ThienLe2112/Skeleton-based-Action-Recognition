@@ -428,7 +428,7 @@ class Model(nn.Module):
         # x_trans = self.tcn0(x_trans)
         # print("x_trans.shape: ", x_trans.shape)
         x_trans = x
-        print("x.shape: ", x.shape)
+        # print("x.shape: ", x.shape)
         for i, m in enumerate(self.backbone):
             if i == 3 and self.concat_original:
                 x_trans = m(torch.cat((x_trans, x_coord), dim=1), label, name)

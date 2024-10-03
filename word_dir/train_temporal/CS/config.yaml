@@ -80,7 +80,7 @@ save_interval: 1
 save_score: false
 scheduler: 1
 scheduling_lr: true
-seed: 58
+seed: 12
 show_topk:
 - 1
 - 5
