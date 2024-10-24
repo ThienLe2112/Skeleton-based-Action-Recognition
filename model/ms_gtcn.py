@@ -47,7 +47,7 @@ class SpatialTemporal_MS_GCN(nn.Module):
                  num_scales,
                  window_size,
                  disentangled_agg=True,##Original, disentangled_agg=True
-                 use_Ares=False, ##Original, use_Ares=True
+                 use_Ares=True, ##Original, use_Ares=True
                  residual=False,
                  dropout=0,
                  activation='relu'):
@@ -90,7 +90,8 @@ class SpatialTemporal_MS_GCN(nn.Module):
         self.A_scales = torch.Tensor(A_scales).to("cuda")
         self.V = len(A_binary)
 
-        if use_Ares:
+        if True:
+        # if use_Ares:
             self.A_res = nn.init.uniform_(nn.Parameter(torch.randn(self.A_scales.shape)), -1e-6, 1e-6)
         else:
             self.A_res = torch.tensor(0)
@@ -138,84 +139,97 @@ class SpatialTemporal_MS_GCN(nn.Module):
         ##Edit Code Begin 6
         
         ##Calculate DSG Matrix Method 5
+        # print("self.A_res.shape: ", self.A_res.shape)
         xx = xx.permute(0,2,3,1).contiguous()
         N, T, V, C = x.shape
         xx_reshaped = xx.cuda(non_blocking = True)
         
         dists = torch.norm(xx_reshaped[:, :, :,None, :] - xx_reshaped[:, :, None, :, :], dim=-1).to("cuda")#Shape: N, T, V, V
-        lamda=0.5
-        A_dsg = torch.exp(-(dists**2)/lamda).to("cuda") #Shape: N, T, V, V
-        
-        #Dynamic DSG Matrix
-        if x.shape[2] == 150:
-            weights= torch.ones(1,1,2,1,1,device = x.device)*1/300
-            # print("A_scales.shape: ",A_scales.shape)
-            
-            A_dsg_all = F.conv3d(A_dsg[:,None,:,:,:],weights,stride = (2,1,1)) 
-            NN, _, TT, VV, _ = A_dsg_all.shape
-            A_list = A_dsg_all.reshape(NN,TT,VV,VV)
-            # print("A_list.shape: ", A_list.shape)            
-            
-        elif x.shape[2] == 75:
-            
-            weights= torch.ones(1,1,4,1,1,device = x.device)*1/300
-            A_dsg_all = F.conv3d(A_dsg[:,None,:,:,:],weights,stride = (4,1,1)) 
-            # print("A_list.shape: ", A_list.shape)  
-            NN, _, TT, VV, _ = A_dsg_all.shape
-            A_list = A_dsg_all.reshape(NN,TT,VV,VV)
-
-        else:
-            A_list = A_dsg
-            
-        A_norm = normalize_dsg_adjacency_matrix(A_list)
-        
-        A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).to("cuda").clone()  
-                                            for t in i]).to("cuda") 
-                                                for i in A_norm]).to("cuda")
-        if self.num_scales == 1:
-            A_scales = torch.cat([A_large for k in range(self.num_scales )], dim = 2).to("cuda")
-        else:
-            A_scales = torch.cat([A_large for k in range(self.num_scales - 1 )], dim = 2).to("cuda")
-
-        A_list = A_scales
-        N, C, T, V = x.shape    # T = number of windows
-            
-        res = self.residual(x.clone())
-        agg = torch.einsum('ntvu,nctu->nctv', A_list, x)
-
-        
-        ## Adaptive DSG   
-        
-        # weights= torch.ones(1,1,300,1,1,device = x.device)*1/300
-        # A_dsg_all = F.conv3d(A_dsg[:,None,:,:,:],weights) 
-        # N_xx,_,_, V_xx,_ = A_dsg_all.shape
-        # A_norm = A_dsg_all.reshape(N_xx, V_xx, V_xx)         
-        # A_norm = torch.stack([normalize_adjacency_matrix_cuda(A_norm[n]) for n in range(N)])
-        # A_binary_with_I = A_norm
-        
-        # A_large = torch.stack([i.repeat(self.window_size, self.window_size).clone() for i in A_binary_with_I])
-        # A = A_large
-        # A_scales = [A for k in range(self.num_scales)]
-
-        # A_scales = torch.stack([A[i] for i in range(len(A)) for k in range(self.num_scales) ]) 
-        # res = self.residual(x)
-        # agg = torch.einsum('nvu,nctu->nctv', A_scales, x)
-        # N, C, T, V = x.shape
+        lamda = 0.5
         ####################################### PLOT MODEL
         # import seaborn as sns
         # import pandas as pd
         # import matplotlib.pyplot as plt
-        # for t in range(self.num_scales):
+        # lambda_lst = [0.2,0.5,0.6,0.8,1.0,1.3,1.5]
+        # for t in lambda_lst:
         #     # t = 6 # t= 0, 3, 6, 9 
-        #     px = pd.DataFrame(A_adapt[0,0].cpu().numpy())
+        #     A_plt= torch.exp(-(dists**2)/t).to("cuda") #Shape: N, T, V, V
+        #     px = pd.DataFrame(A_plt[0,0].detach().cpu().numpy())
         #     # px = pd.DataFrame(A_list[0,0,t*3*25:(t*3+1)*25,0:25].cpu().numpy())
         #     # print(A_dsg.shape)
         #     # # glue = sns.load_dataset("glue").pivot(index="Model", columns="Task", values="Score")
-        #     sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True)
+        #     sns.heatmap(px, vmin = 0, vmax = 1, cmap = sns.color_palette("Blues", as_cmap=True),annot=True,  fmt = '.2f')
         #     plt.title(f'A_dsg({t})')
         #     plt.show()
         # return
         #######################################
+        
+        
+        A_dsg = torch.exp(-(dists**2)/lamda).to("cuda") #Shape: N, T, V, V
+        
+        #Dynamic DSG Matrix
+        # if x.shape[2] == 150:
+        #     weights= torch.ones(1,1,2,1,1,device = x.device)*1/300
+        #     # print("A_scales.shape: ",A_scales.shape)
+            
+        #     A_dsg_all = F.conv3d(A_dsg[:,None,:,:,:],weights,stride = (2,1,1)) 
+        #     NN, _, TT, VV, _ = A_dsg_all.shape
+        #     A_list = A_dsg_all.reshape(NN,TT,VV,VV)
+        #     # print("A_list.shape: ", A_list.shape)            
+            
+        # elif x.shape[2] == 75:
+            
+        #     weights= torch.ones(1,1,4,1,1,device = x.device)*1/300
+        #     A_dsg_all = F.conv3d(A_dsg[:,None,:,:,:],weights,stride = (4,1,1)) 
+        #     # print("A_list.shape: ", A_list.shape)  
+        #     NN, _, TT, VV, _ = A_dsg_all.shape
+        #     A_list = A_dsg_all.reshape(NN,TT,VV,VV)
+
+        # else:
+        #     A_list = A_dsg
+            
+        # A_norm = normalize_dsg_adjacency_matrix(A_list)
+        
+        # A_large = torch.stack([torch.stack([t.repeat(self.window_size, self.window_size).to("cuda").clone()  
+        #                                     for t in i]).to("cuda") 
+        #                                         for i in A_norm]).to("cuda")
+        # if self.num_scales == 1:
+        #     A_scales = torch.cat([A_large for k in range(self.num_scales )], dim = 2).to("cuda")
+        # else:
+        #     A_scales = torch.cat([A_large for k in range(self.num_scales - 1 )], dim = 2).to("cuda")
+
+        # A_list = A_scales
+        # N, C, T, V = x.shape    # T = number of windows
+            
+        # res = self.residual(x.clone())
+        # agg = torch.einsum('ntvu,nctu->nctv', A_list, x)
+
+        
+        ## Adaptive DSG   
+        
+
+        weights= torch.ones(1,1,300,1,1,device = x.device)*1/300
+        A_dsg_all = F.conv3d(A_dsg[:,None,:,:,:],weights) 
+        N_xx,_,_, V_xx,_ = A_dsg_all.shape
+        A_norm = A_dsg_all.reshape(N_xx, V_xx, V_xx)         
+        A_norm = torch.stack([normalize_adjacency_matrix_cuda(A_norm[n]) for n in range(N)])
+        A_binary_with_I = A_norm
+        
+        A_large = torch.stack([i.repeat(self.window_size, self.window_size).clone() for i in A_binary_with_I])
+        # A = A_large
+        A = A_large + self.A_res.to(x.dtype).to(x.device)
+        # print(self.A_res)
+        
+        # A_scales = [A for k in range(self.num_scales)]
+
+        # A_scales = torch.stack([A[i] for i in range(len(A)) for k in range(self.num_scales) ]) 
+        # self.A_res = nn.init.uniform_(nn.Parameter(torch.randn(A_scales.shape)), -1e-6, 1e-6)
+        # A = A_scales 
+        # A = A_scales + self.A_res.to(x.dtype).to(x.device)
+        
+        res = self.residual(x)
+        agg = torch.einsum('nvu,nctu->nctv', A, x)
+        N, C, T, V = x.shape
 
 
 
