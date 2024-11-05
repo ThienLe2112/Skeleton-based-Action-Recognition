@@ -58,12 +58,12 @@ class SpatialTemporal_MS_GCN(nn.Module):
         self.use_Ares = use_Ares
         A = self.build_spatial_temporal_graph(A_binary, window_size)
 
-        #Edit Code Begin 15
-        # num_scales = num_scales - 1
-        self.conv = torch.nn.Conv3d(1,1,(300,1,1),padding=(0,0,0),stride=(300,1,1))
-        self.conv2l150 = torch.nn.Conv3d(1,1,(2,1,1),padding=(0,0,0),stride=(2,1,1))
-        self.conv2l75 = torch.nn.Conv3d(1,1,(4,1,1),padding=(0,0,0),stride=(4,1,1))
-        #Edit Code End 15
+        # #Edit Code Begin 15
+        # # num_scales = num_scales - 1
+        # self.conv = torch.nn.Conv3d(1,1,(300,1,1),padding=(0,0,0),stride=(300,1,1))
+        # self.conv2l150 = torch.nn.Conv3d(1,1,(2,1,1),padding=(0,0,0),stride=(2,1,1))
+        # self.conv2l75 = torch.nn.Conv3d(1,1,(4,1,1),padding=(0,0,0),stride=(4,1,1))
+        # #Edit Code End 15
         if disentangled_agg:
             #Edit Code Begin 18
             if num_scales == 1:
@@ -88,13 +88,13 @@ class SpatialTemporal_MS_GCN(nn.Module):
             A_scales = np.concatenate(A_scales)
 
         self.A_scales = torch.Tensor(A_scales).to("cuda")
-        self.V = len(A_binary)
+        # self.V = len(A_binary)
 
-        if True:
-        # if use_Ares:
-            self.A_res = nn.init.uniform_(nn.Parameter(torch.randn(self.A_scales.shape)), -1e-6, 1e-6)
-        else:
-            self.A_res = torch.tensor(0)
+        # if True:
+        # # if use_Ares:
+        self.A_res = nn.init.uniform_(nn.Parameter(torch.randn(self.A_scales.shape)), -1e-6, 1e-6)
+        # else:
+        #     self.A_res = torch.tensor(0)
 
         self.mlp = MLP(in_channels * num_scales, [out_channels], dropout=dropout, activation='linear')
 
@@ -198,10 +198,10 @@ class SpatialTemporal_MS_GCN(nn.Module):
         # else:
         #     A_scales = torch.cat([A_large for k in range(self.num_scales - 1 )], dim = 2).to("cuda")
 
-        # A_list = A_scales
+        # A_list = A_scales 
+        # A_list = A_scales + self.A_res.to(x.dtype).to(x.device)
         # N, C, T, V = x.shape    # T = number of windows
             
-        # res = self.residual(x.clone())
         # agg = torch.einsum('ntvu,nctu->nctv', A_list, x)
 
         
@@ -218,21 +218,16 @@ class SpatialTemporal_MS_GCN(nn.Module):
         A_large = torch.stack([i.repeat(self.window_size, self.window_size).clone() for i in A_binary_with_I])
         # A = A_large
         A = A_large + self.A_res.to(x.dtype).to(x.device)
-        # print(self.A_res)
+
         
-        # A_scales = [A for k in range(self.num_scales)]
+        # agg = torch.einsum('nvu,nctu->nctv', A, x)
 
-        # A_scales = torch.stack([A[i] for i in range(len(A)) for k in range(self.num_scales) ]) 
-        # self.A_res = nn.init.uniform_(nn.Parameter(torch.randn(A_scales.shape)), -1e-6, 1e-6)
-        # A = A_scales 
-        # A = A_scales + self.A_res.to(x.dtype).to(x.device)
-        
-        res = self.residual(x)
-        agg = torch.einsum('nvu,nctu->nctv', A, x)
-        N, C, T, V = x.shape
-
-
-
+        #Batch Adjacecency
+        n, v, u = A.shape
+        weight = torch.ones(1,n,1,1,dtype = A.dtype, device = A.device)*1/n
+        A_scale = F.conv2d(A[None,:,:,:],weight).reshape(v,u)
+        A = A_scale
+        # print(A.shape)
         
         
         
@@ -240,8 +235,10 @@ class SpatialTemporal_MS_GCN(nn.Module):
 
         # Perform Graph Convolution
         #Origin Code Begin
-        # res = self.residual(x)
-        # agg = torch.einsum('vu,nctu->nctv', A, x)
+        N, C, T, V = x.shape
+
+        res = self.residual(x)
+        agg = torch.einsum('vu,nctu->nctv', A, x)
         
         #Origin Code End
         agg = agg.view(N, C, T, self.num_scales, V).to("cuda")

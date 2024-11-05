@@ -154,8 +154,9 @@ bone_pairs = {
 
 
 def visualize(args):
-    data_path = args.datapath or './data/{}/val_data_joint.npy'.format(args.dataset)
-    label_path = args.labelpath or './data/{}/val_label.pkl.npy'.format(args.dataset)
+    data_path = args.datapath or '/home/user/Thien/MS-G3D/data/{}/val_data_joint.npy'.format(args.dataset)
+    label_path = args.labelpath or '/home/user/Thien/MS-G3D/data/{}/val_label.pkl'.format(args.dataset)
+    # label_path = args.labelpath or '/home/user/Thien/MS-G3D/data/{}/val_label.pkl.npy'.format(args.dataset)
 
     data = np.load(data_path, mmap_mode='r')
     with open(label_path, 'rb') as f:
@@ -183,7 +184,9 @@ def visualize(args):
     for index in args.indices:
         mpl.rcParams['legend.fontsize'] = 10
         fig = plt.figure()
-        ax = fig.gca(projection='3d')
+        ax = fig.add_subplot(projection = '3d')
+
+        # ax = fig.gca(projection='3d')
         ax.set_xlim([-1,1])
         ax.set_ylim([-1,1])
         ax.set_zlim([-1,1])

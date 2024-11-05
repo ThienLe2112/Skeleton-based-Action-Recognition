@@ -21,12 +21,8 @@ from torch.optim.lr_scheduler import MultiStepLR
 import apex
 
 from utils import count_params, import_class
-
 from torch.utils.data import RandomSampler
 
-from arg_types import arg_boolean, arg_dict
-
-name_exp = 'prova20'
 
 
 def init_seed(seed):
@@ -43,12 +39,12 @@ def get_parser():
     parser.add_argument(
         '--work-dir',
         type=str,
-        required=False,
+        required=True,
         help='the work folder for storing results')
     parser.add_argument('--model_saved_name', default='')
     parser.add_argument(
         '--config',
-        default='./config/nturgbd-cross-subject/train_joint.yaml',
+        default='./config/nturgbd-cross-view/test_bone.yaml',
         help='path to the configuration file')
     parser.add_argument(
         '--assume-yes',
@@ -219,53 +215,6 @@ def get_parser():
         default=False,
         help='Debug mode; default false')
 
-    #Transformer begin 2
-    parser.add_argument('--val_split', type=int, default=0.2)
-    parser.add_argument('--data_dir', type=str)
-    parser.add_argument('--log_dir', type=str)
-    parser.add_argument('--exp_name', type=str, default=name_exp)
-
-    parser.add_argument('--clip_grad_norm', type=float, default=0.5)
-    parser.add_argument('--writer_enabled', type=arg_boolean, default=True)
-    parser.add_argument('--gcn0_flag', type=arg_boolean, default=False)
-    parser.add_argument('--scheduling_lr', type=arg_boolean, default=True)
-    parser.add_argument('--complete', type=arg_boolean, default=True)
-    parser.add_argument('--bn_flag', type=arg_boolean, default=True)
-    parser.add_argument('--accumulating_gradients', type=arg_boolean, default=True)
-    parser.add_argument('--optimize_every', type=int, default=2)
-    parser.add_argument('--clip', type=arg_boolean, default=False)
-    parser.add_argument('--validation_split', type=arg_boolean, default=False)
-    parser.add_argument('--data_mirroring', type=arg_boolean, default=False)
-    parser.add_argument('--local_rank', type=int, default=0)
-
-    parser.add_argument(
-        '--training', type=str2bool, default=True, help='training or testing mode')
-
-    parser.add_argument(
-        '--feeder_augmented', default='feeder.feeder_augmented', help='data loader will be used')
-
-    parser.add_argument(
-        '--train_feeder_args_new',
-        default=dict(),
-        help='the arguments of data loader for training')
-    parser.add_argument(
-        '--test_feeder_args_new',
-        default=dict(),
-        help='the arguments of data loader for test')
-    parser.add_argument(
-        '--scheduler', type=float, default=0, help='initial learning rate')
-
-    parser.add_argument(
-        '--display_by_category',
-        type=str2bool,
-        default=False,
-        help='if ture, the top k accuracy by category  will be displayed')
-    parser.add_argument(
-        '--display_recall_precision',
-        type=str2bool,
-        default=False,
-        help='if ture, recall and precision by category  will be displayed')
-    #Transformer end 2
     return parser
 
 
@@ -432,46 +381,35 @@ class Processor():
     def load_data(self):
         Feeder = import_class(self.arg.feeder)
         self.data_loader = dict()
-        ##Edit Code Begin 1
-        downsample_rate = 5
-        ##Edit Code End 1
+
         def worker_seed_fn(worker_id):
             # give workers different seeds
             return init_seed(self.arg.seed + worker_id + 1)
 
         if self.arg.phase == 'train':
-
-            ##Edit Code Begin 2
+            
+            ##Edit Code Begin 1
+            downsample_rate = 5
             dataset = Feeder(**self.arg.train_feeder_args)
             random_sampler = RandomSampler(dataset, replacement=False, num_samples=int(len(dataset) / downsample_rate))
-            ##Edit Code End 2
-
+            ##Edit Code End 1
             self.data_loader['train'] = torch.utils.data.DataLoader(
-
-                dataset,
+                dataset=dataset,
                 batch_size=self.arg.batch_size,
-                shuffle=False, ### original shuffle=True
+                shuffle=False,
                 num_workers=self.arg.num_worker,
                 drop_last=True,
                 worker_init_fn=worker_seed_fn,
                 sampler=random_sampler  ### random_sampler only
-
-            )
-        ##Edit Code Begin 11
-        dataset = Feeder(**self.arg.test_feeder_args)
-        # random_sampler = RandomSampler(dataset, replacement=False, num_samples=int(len(dataset) / downsample_rate))
-
-        ##Edit Code End 11
+                )
 
         self.data_loader['test'] = torch.utils.data.DataLoader(
-            dataset=dataset,
+            dataset=Feeder(**self.arg.test_feeder_args),
             batch_size=self.arg.test_batch_size,
             shuffle=False,
             num_workers=self.arg.num_worker,
             drop_last=False,
-            worker_init_fn=worker_seed_fn,
-            # sampler=random_sampler  ### random_sampler only
-        )
+            worker_init_fn=worker_seed_fn)
 
     def save_arg(self):
         # save arg
@@ -540,7 +478,7 @@ class Processor():
         current_lr = self.optimizer.param_groups[0]['lr']
         self.print_log(f'Training epoch: {epoch + 1}, LR: {current_lr:.4f}')
 
-        process = tqdm(loader, dynamic_ncols=True,colour='#eb34b1')
+        process = tqdm(loader, dynamic_ncols=True)
         for batch_idx, (data, label, index) in enumerate(process):
             self.global_step += 1
             # get data
@@ -564,13 +502,7 @@ class Processor():
                 batch_data, batch_label = data[left:right], label[left:right]
 
                 # forward
-                ##Edit Code Begin 10
-                # print('batch_data.shape: ',batch_data.shape)
-                # index = index[0]
-                output = self.model(batch_data,label, index)
-                ##Edit Code End 10
-                # output = self.model(batch_data)
-
+                output = self.model(batch_data)
                 if isinstance(output, tuple):
                     output, l1 = output
                     l1 = l1.mean()
@@ -650,7 +582,7 @@ class Processor():
                 loss_values = []
                 score_batches = []
                 step = 0
-                process = tqdm(self.data_loader[ln], dynamic_ncols=True,colour='#61eb34')
+                process = tqdm(self.data_loader[ln], dynamic_ncols=True)
                 for batch_idx, (data, label, index) in enumerate(process):
                     data = data.float().cuda(self.output_device)
                     label = label.long().cuda(self.output_device)
