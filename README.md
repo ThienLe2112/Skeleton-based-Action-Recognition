@@ -1,8 +1,8 @@
-# MS-G3D
+# Skeleton-based action recognition based on dynamic – adaptive spatial graph convolution neural network and spatial transformer
 
-PyTorch implementation of "Disentangling and Unifying Graph Convolutions for Skeleton-Based Action Recognition", CVPR 2020 Oral.
+This project was implemented by Le Chi Thien during an internship at CCU.
 
-[[PDF](https://arxiv.org/pdf/2003.14111.pdf)][[Demo](https://youtu.be/5TcHIIece38)][[Abstract/Supp](https://openaccess.thecvf.com/content_CVPR_2020/html/Liu_Disentangling_and_Unifying_Graph_Convolutions_for_Skeleton-Based_Action_Recognition_CVPR_2020_paper.html)]
+[[PDF](https://drive.google.com/file/d/1tNmAcr2sNw_WqjDh1oWKMhlfEzCKcZOw/view?usp=sharing)][[Demo from Ziyu Liu](https://youtu.be/5TcHIIece38)]
 
 
 <img src="imgs/cropped-fixed-standup.gif" width="24%"><img src="imgs/cropped-fixed-clap.gif" width="24%">
