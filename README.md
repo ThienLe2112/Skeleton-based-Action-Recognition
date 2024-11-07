@@ -204,7 +204,5 @@ Thanks to the original authors for their work!
 
 
 ```
-
-
 ## Contact
 Please email `lechithien2112@gmail.com` for further questions
